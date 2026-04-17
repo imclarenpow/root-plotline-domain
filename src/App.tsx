@@ -35,6 +35,7 @@ const VERTICAL_WOBBLE_DAMPING = 0.8;
 const COUPLED_PULL_FROM_CENTER_DRAG = 0.44;
 const COUPLED_PULL_TO_CENTER = 0.3;
 const COUPLED_PULL_TO_PEER = 0.2;
+const SIZE_CHANGE_THRESHOLD = 0.01;
 const wobbleDirectionByNode: Record<NodeKey, number> = {
   center: 0,
   app: -1,
@@ -91,8 +92,8 @@ export function App() {
           const halfHeight = (nodeBounds.height / 2) * unitsPerPixelY;
 
           if (
-            Math.abs(previous[key].halfWidth - halfWidth) > 0.01
-            || Math.abs(previous[key].halfHeight - halfHeight) > 0.01
+            Math.abs(previous[key].halfWidth - halfWidth) > SIZE_CHANGE_THRESHOLD
+            || Math.abs(previous[key].halfHeight - halfHeight) > SIZE_CHANGE_THRESHOLD
           ) {
             next[key] = { halfWidth, halfHeight };
             changed = true;
@@ -115,11 +116,8 @@ export function App() {
         resizeObserver.observe(nodeElement);
       }
     });
-    window.addEventListener("resize", measureNodeHalfSizes);
-
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener("resize", measureNodeHalfSizes);
     };
   }, []);
 
