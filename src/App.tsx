@@ -31,6 +31,14 @@ const MAX_WOBBLE_MAGNITUDE = 2.8;
 const DEFAULT_RETURN_FORCE = 0.06;
 const PERPENDICULAR_WOBBLE_FACTOR = 0.07;
 const VERTICAL_WOBBLE_DAMPING = 0.8;
+const COUPLED_PULL_FROM_CENTER_DRAG = 0.44;
+const COUPLED_PULL_TO_CENTER = 0.3;
+const COUPLED_PULL_TO_PEER = 0.2;
+const wobbleDirectionByNode: Record<NodeKey, number> = {
+  center: 0,
+  app: -1,
+  sites: 1,
+};
 
 const clampPointToGraph = (key: NodeKey, point: Point): Point => {
   const bounds = nodeBounds[key];
@@ -87,13 +95,13 @@ export function App() {
           if (key === drag.key) return;
 
           const coupledPull =
-            drag.key === "center" ? 0.44 : key === "center" ? 0.3 : 0.2;
+            drag.key === "center" ? COUPLED_PULL_FROM_CENTER_DRAG : key === "center" ? COUPLED_PULL_TO_CENTER : COUPLED_PULL_TO_PEER;
           const toDefault = {
             x: defaultPositions[key].x - previous[key].x,
             y: defaultPositions[key].y - previous[key].y,
           };
           const wobbleStrength = Math.min(movedMagnitude * WOBBLE_SCALE_FACTOR, MAX_WOBBLE_MAGNITUDE);
-          const wobbleDirection = key === "sites" ? 1 : -1;
+          const wobbleDirection = wobbleDirectionByNode[key];
           const coupledMotion = {
             x: movedBy.x * coupledPull,
             y: movedBy.y * coupledPull,
