@@ -7,8 +7,6 @@ type Point = { x: number; y: number };
 type NodeMap = Record<NodeKey, Point>;
 
 const GRAPH_SIZE = { width: 860, height: 520 };
-const NODE_RADIUS = 54;
-
 const defaultPositions: NodeMap = {
   center: { x: GRAPH_SIZE.width / 2, y: GRAPH_SIZE.height / 2 },
   app: { x: GRAPH_SIZE.width / 2 - 230, y: GRAPH_SIZE.height / 2 - 120 },
@@ -25,7 +23,13 @@ export function App() {
   const sceneRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<HTMLDivElement>(null);
   const [positions, setPositions] = useState<NodeMap>(defaultPositions);
-  const [drag, setDrag] = useState<{ key: NodeKey; offsetX: number; offsetY: number } | null>(null);
+  const [drag, setDrag] = useState<{
+    key: NodeKey;
+    offsetX: number;
+    offsetY: number;
+    halfWidth: number;
+    halfHeight: number;
+  } | null>(null);
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -36,12 +40,12 @@ export function App() {
       if (!graphBounds) return;
 
       const nextX = Math.min(
-        Math.max(event.clientX - graphBounds.left - drag.offsetX, NODE_RADIUS),
-        graphBounds.width - NODE_RADIUS,
+        Math.max(event.clientX - graphBounds.left - drag.offsetX, drag.halfWidth),
+        graphBounds.width - drag.halfWidth,
       );
       const nextY = Math.min(
-        Math.max(event.clientY - graphBounds.top - drag.offsetY, NODE_RADIUS),
-        graphBounds.height - NODE_RADIUS,
+        Math.max(event.clientY - graphBounds.top - drag.offsetY, drag.halfHeight),
+        graphBounds.height - drag.halfHeight,
       );
 
       setPositions(previous => ({
@@ -112,10 +116,14 @@ export function App() {
             style={{ left: positions[key].x, top: positions[key].y }}
             onPointerDown={event => {
               const bounds = event.currentTarget.getBoundingClientRect();
+              const centerX = bounds.left + bounds.width / 2;
+              const centerY = bounds.top + bounds.height / 2;
               setDrag({
                 key,
-                offsetX: event.clientX - bounds.left,
-                offsetY: event.clientY - bounds.top,
+                offsetX: event.clientX - centerX,
+                offsetY: event.clientY - centerY,
+                halfWidth: bounds.width / 2,
+                halfHeight: bounds.height / 2,
               });
             }}
           >
@@ -126,5 +134,3 @@ export function App() {
     </div>
   );
 }
-
-export default App;
