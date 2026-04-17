@@ -72,8 +72,8 @@ export function App() {
     const offsetY = (event.clientY - sceneBounds.top) / sceneBounds.height - 0.5;
 
     setParallax({
-      x: Number((offsetX * 2).toFixed(3)),
-      y: Number((offsetY * 2).toFixed(3)),
+      x: Math.round(offsetX * 2000) / 1000,
+      y: Math.round(offsetY * 2000) / 1000,
     });
   };
 
@@ -111,7 +111,7 @@ export function App() {
             className={`node ${key === "center" ? "center" : "leaf"}`}
             style={{ left: positions[key].x, top: positions[key].y }}
             onPointerDown={event => {
-              const bounds = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
+              const bounds = event.currentTarget.getBoundingClientRect();
               setDrag({
                 key,
                 offsetX: event.clientX - bounds.left,
