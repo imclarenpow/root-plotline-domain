@@ -39,22 +39,42 @@ body {
 
 .space-page::before {
   background-image:
-    radial-gradient(circle, rgb(255 255 255 / 70%) 0 1px, transparent 1.2px),
-    radial-gradient(circle, rgb(172 214 255 / 75%) 0 1px, transparent 1.2px);
-  background-size: 72px 72px, 108px 108px;
-  background-position: 0 0, 24px 36px;
+    radial-gradient(1.7px 1.7px at 6% 12%, rgb(255 255 255 / 88%) 0 75%, transparent 100%),
+    radial-gradient(1.4px 1.4px at 14% 68%, rgb(220 214 255 / 82%) 0 72%, transparent 100%),
+    radial-gradient(1.2px 1.2px at 27% 34%, rgb(255 255 255 / 82%) 0 70%, transparent 100%),
+    radial-gradient(2.1px 2.1px at 38% 79%, rgb(227 214 255 / 88%) 0 70%, transparent 100%),
+    radial-gradient(1.3px 1.3px at 44% 20%, rgb(247 241 255 / 80%) 0 70%, transparent 100%),
+    radial-gradient(1.9px 1.9px at 59% 61%, rgb(255 255 255 / 90%) 0 72%, transparent 100%),
+    radial-gradient(1.1px 1.1px at 67% 17%, rgb(219 209 255 / 76%) 0 72%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 74% 46%, rgb(255 255 255 / 84%) 0 72%, transparent 100%),
+    radial-gradient(1.8px 1.8px at 83% 13%, rgb(225 214 255 / 84%) 0 72%, transparent 100%),
+    radial-gradient(1.6px 1.6px at 91% 71%, rgb(255 255 255 / 90%) 0 72%, transparent 100%);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   transform: translate(calc(var(--parallax-x) * -15px), calc(var(--parallax-y) * -12px));
-  opacity: 0.85;
-  animation: twinkle 8s ease-in-out infinite alternate;
+  opacity: 0.88;
+  animation: twinkle 6.5s ease-in-out infinite alternate;
 }
 
 .space-page::after {
-  background-image: radial-gradient(circle, rgb(184 227 255 / 55%) 0 1px, transparent 1.2px);
-  background-size: 130px 130px;
-  background-position: 20px 20px;
+  background-image:
+    radial-gradient(1px 1px at 4% 83%, rgb(255 255 255 / 74%) 0 70%, transparent 100%),
+    radial-gradient(1.3px 1.3px at 12% 29%, rgb(228 215 255 / 74%) 0 70%, transparent 100%),
+    radial-gradient(1px 1px at 19% 56%, rgb(255 255 255 / 66%) 0 70%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 26% 11%, rgb(219 200 255 / 72%) 0 72%, transparent 100%),
+    radial-gradient(1px 1px at 35% 87%, rgb(255 255 255 / 68%) 0 70%, transparent 100%),
+    radial-gradient(1.2px 1.2px at 49% 39%, rgb(225 205 255 / 72%) 0 70%, transparent 100%),
+    radial-gradient(1.1px 1.1px at 57% 73%, rgb(255 255 255 / 72%) 0 70%, transparent 100%),
+    radial-gradient(1.4px 1.4px at 65% 26%, rgb(220 201 255 / 68%) 0 70%, transparent 100%),
+    radial-gradient(1.1px 1.1px at 73% 92%, rgb(255 255 255 / 72%) 0 70%, transparent 100%),
+    radial-gradient(1.3px 1.3px at 82% 52%, rgb(224 206 255 / 70%) 0 70%, transparent 100%),
+    radial-gradient(1px 1px at 89% 31%, rgb(255 255 255 / 67%) 0 70%, transparent 100%),
+    radial-gradient(1.2px 1.2px at 96% 15%, rgb(217 197 255 / 66%) 0 70%, transparent 100%);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   transform: translate(calc(var(--parallax-x) * -28px), calc(var(--parallax-y) * -24px));
-  opacity: 0.5;
-  animation: drift 18s linear infinite;
+  opacity: 0.56;
+  animation: drift 20s linear infinite;
 }
 
 .graph {
@@ -72,11 +92,9 @@ body {
 }
 
 .edges line {
-  stroke: rgb(138 208 255 / 78%);
+  stroke: rgb(179 126 255 / 86%);
   stroke-width: 2;
   stroke-linecap: round;
-  stroke-dasharray: 6 10;
-  animation: flow 3s linear infinite;
 }
 
 .node {
@@ -84,9 +102,9 @@ body {
   transform: translate(-50%, -50%);
   min-width: 178px;
   border-radius: 999px;
-  border: 1px solid rgb(147 216 255 / 70%);
-  color: #edf7ff;
-  background: linear-gradient(120deg, rgb(84 159 232 / 22%), rgb(116 200 255 / 42%));
+  border: 1px solid rgb(194 151 255 / 80%);
+  color: #f8efff;
+  background: linear-gradient(120deg, rgb(117 64 191 / 35%), rgb(148 88 214 / 56%));
   font-size: 0.92rem;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -95,15 +113,15 @@ body {
   touch-action: none;
   user-select: none;
   backdrop-filter: blur(3px);
-  box-shadow: 0 0 0 rgb(129 212 255 / 0%), 0 0 30px rgb(107 190 252 / 26%);
+  box-shadow: 0 0 0 rgb(173 126 255 / 0%), 0 0 30px rgb(148 96 230 / 30%);
   transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
 .node:hover,
 .node:focus-visible {
   transform: translate(-50%, -50%) scale(1.05);
-  border-color: rgb(191 234 255 / 85%);
-  box-shadow: 0 0 18px rgb(121 208 255 / 48%), 0 0 35px rgb(98 192 255 / 24%);
+  border-color: rgb(226 196 255 / 96%);
+  box-shadow: 0 0 18px rgb(186 127 255 / 52%), 0 0 35px rgb(149 95 231 / 28%);
 }
 
 .node:active {
@@ -112,8 +130,10 @@ body {
 
 .center {
   min-width: 192px;
-  background: linear-gradient(120deg, rgb(65 158 255 / 44%), rgb(105 221 255 / 74%));
-  color: #0c1b3b;
+  border-color: rgb(236 214 255 / 95%);
+  background: linear-gradient(120deg, rgb(167 98 245 / 72%), rgb(206 143 255 / 92%));
+  color: #fff9ff;
+  box-shadow: 0 0 22px rgb(195 137 255 / 62%), 0 0 44px rgb(176 112 248 / 38%);
 }
 
 .leaf {
@@ -131,26 +151,20 @@ body {
 
 @keyframes drift {
   0% {
-    background-position: 20px 20px;
+    transform: translate(calc(var(--parallax-x) * -28px), calc(var(--parallax-y) * -24px));
   }
   100% {
-    background-position: 72px 88px;
-  }
-}
-
-@keyframes flow {
-  to {
-    stroke-dashoffset: -32;
+    transform: translate(calc(var(--parallax-x) * -32px), calc(var(--parallax-y) * -20px));
   }
 }
 
 @keyframes pulse {
   0%,
   100% {
-    box-shadow: 0 0 12px rgb(123 212 255 / 30%);
+    box-shadow: 0 0 12px rgb(169 112 248 / 34%);
   }
   50% {
-    box-shadow: 0 0 26px rgb(147 227 255 / 50%);
+    box-shadow: 0 0 26px rgb(201 152 255 / 54%);
   }
 }
 

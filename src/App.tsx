@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import "./index.css";
 
 type NodeKey = "center" | "app" | "sites";
 type Point = { x: number; y: number };
+type NodeHalfSize = { halfWidth: number; halfHeight: number };
 
 type NodeMap = Record<NodeKey, Point>;
 
@@ -18,11 +19,42 @@ const labels: Record<NodeKey, string> = {
   app: "app.plotline.nz",
   sites: "sites.plotline.nz",
 };
+const nodeKeys = Object.keys(labels) as NodeKey[];
+
+const DEFAULT_NODE_HALF_SIZES: Record<NodeKey, NodeHalfSize> = {
+  center: { halfWidth: 106, halfHeight: 26 },
+  app: { halfWidth: 96, halfHeight: 24 },
+  sites: { halfWidth: 96, halfHeight: 24 },
+};
+
+const WOBBLE_SCALE_FACTOR = 0.08;
+const MAX_WOBBLE_MAGNITUDE = 2.8;
+const DEFAULT_RETURN_FORCE = 0.06;
+const PERPENDICULAR_WOBBLE_FACTOR = 0.07;
+const VERTICAL_WOBBLE_DAMPING = 0.8;
+const COUPLED_PULL_FROM_CENTER_DRAG = 0.44;
+const COUPLED_PULL_TO_CENTER = 0.3;
+const COUPLED_PULL_TO_PEER = 0.2;
+const SIZE_CHANGE_THRESHOLD = 0.01;
+const wobbleDirectionByNode: Record<NodeKey, number> = {
+  center: 0,
+  app: -1,
+  sites: 1,
+};
+
+const getCoupledPullForce = (draggedKey: NodeKey, targetKey: NodeKey) => {
+  if (draggedKey === "center") return COUPLED_PULL_FROM_CENTER_DRAG;
+  if (targetKey === "center") return COUPLED_PULL_TO_CENTER;
+  return COUPLED_PULL_TO_PEER;
+};
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 export function App() {
   const sceneRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<HTMLDivElement>(null);
+  const nodeRefs = useRef<Partial<Record<NodeKey, HTMLButtonElement | null>>>({});
   const [positions, setPositions] = useState<NodeMap>(defaultPositions);
+  const [nodeHalfSizes, setNodeHalfSizes] = useState<Record<NodeKey, NodeHalfSize>>(DEFAULT_NODE_HALF_SIZES);
   const [drag, setDrag] = useState<{
     key: NodeKey;
     offsetX: number;
@@ -31,6 +63,80 @@ export function App() {
     halfHeight: number;
   } | null>(null);
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
+  const clampPointToGraph = useCallback((key: NodeKey, point: Point): Point => {
+    const bounds = nodeHalfSizes[key];
+    return {
+      x: clamp(point.x, bounds.halfWidth, GRAPH_SIZE.width - bounds.halfWidth),
+      y: clamp(point.y, bounds.halfHeight, GRAPH_SIZE.height - bounds.halfHeight),
+    };
+  }, [nodeHalfSizes]);
+
+  useEffect(() => {
+    const measureNodeHalfSizes = () => {
+      const graphBounds = graphRef.current?.getBoundingClientRect();
+      if (!graphBounds) return;
+
+      const unitsPerPixelX = GRAPH_SIZE.width / graphBounds.width;
+      const unitsPerPixelY = GRAPH_SIZE.height / graphBounds.height;
+
+      setNodeHalfSizes(previous => {
+        let changed = false;
+        const next = { ...previous };
+
+        nodeKeys.forEach(key => {
+          const nodeElement = nodeRefs.current[key];
+          if (!nodeElement) return;
+
+          const nodeBounds = nodeElement.getBoundingClientRect();
+          const halfWidth = (nodeBounds.width / 2) * unitsPerPixelX;
+          const halfHeight = (nodeBounds.height / 2) * unitsPerPixelY;
+
+          if (
+            Math.abs(previous[key].halfWidth - halfWidth) > SIZE_CHANGE_THRESHOLD
+            || Math.abs(previous[key].halfHeight - halfHeight) > SIZE_CHANGE_THRESHOLD
+          ) {
+            next[key] = { halfWidth, halfHeight };
+            changed = true;
+          }
+        });
+
+        return changed ? next : previous;
+      });
+    };
+
+    measureNodeHalfSizes();
+
+    const resizeObserver = new ResizeObserver(measureNodeHalfSizes);
+    if (graphRef.current) {
+      resizeObserver.observe(graphRef.current);
+    }
+    nodeKeys.forEach(key => {
+      const nodeElement = nodeRefs.current[key];
+      if (nodeElement) {
+        resizeObserver.observe(nodeElement);
+      }
+    });
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    setPositions(previous => {
+      let changed = false;
+      const next = { ...previous };
+
+      nodeKeys.forEach(key => {
+        const clamped = clampPointToGraph(key, previous[key]);
+        if (clamped.x !== previous[key].x || clamped.y !== previous[key].y) {
+          next[key] = clamped;
+          changed = true;
+        }
+      });
+
+      return changed ? next : previous;
+    });
+  }, [clampPointToGraph]);
 
   useEffect(() => {
     if (!drag) return;
@@ -52,13 +158,53 @@ export function App() {
         GRAPH_SIZE.height - drag.halfHeight,
       );
 
-      setPositions(previous => ({
-        ...previous,
-        [drag.key]: {
-          x: nextX,
-          y: nextY,
-        },
-      }));
+      setPositions(previous => {
+        const movedBy = {
+          x: nextX - previous[drag.key].x,
+          y: nextY - previous[drag.key].y,
+        };
+        const movedMagnitude = Math.hypot(movedBy.x, movedBy.y);
+
+        const nextPositions = { ...previous };
+        nextPositions[drag.key] = { x: nextX, y: nextY };
+
+        nodeKeys.forEach(key => {
+          if (key === drag.key) return;
+
+          const coupledPull = getCoupledPullForce(drag.key, key);
+          const toDefault = {
+            x: defaultPositions[key].x - previous[key].x,
+            y: defaultPositions[key].y - previous[key].y,
+          };
+          const wobbleStrength = Math.min(movedMagnitude * WOBBLE_SCALE_FACTOR, MAX_WOBBLE_MAGNITUDE);
+          const wobbleDirection = wobbleDirectionByNode[key];
+          const coupledMotion = {
+            x: movedBy.x * coupledPull,
+            y: movedBy.y * coupledPull,
+          };
+          const restoreForce = {
+            x: toDefault.x * DEFAULT_RETURN_FORCE,
+            y: toDefault.y * DEFAULT_RETURN_FORCE,
+          };
+          const perpendicularWobble = {
+            x: movedBy.y * PERPENDICULAR_WOBBLE_FACTOR * wobbleDirection,
+            y: -movedBy.x * PERPENDICULAR_WOBBLE_FACTOR * wobbleDirection,
+          };
+          const impulseWobble = {
+            x: wobbleStrength * wobbleDirection,
+            y: -wobbleStrength * wobbleDirection * VERTICAL_WOBBLE_DAMPING,
+          };
+
+          const nextPoint = {
+            x: previous[key].x + coupledMotion.x + restoreForce.x + perpendicularWobble.x + impulseWobble.x,
+            y: previous[key].y + coupledMotion.y + restoreForce.y + perpendicularWobble.y + impulseWobble.y,
+          };
+
+          nextPositions[key] = clampPointToGraph(key, nextPoint);
+        });
+
+        return nextPositions;
+      });
     };
 
     const onPointerUp = () => setDrag(null);
@@ -112,11 +258,14 @@ export function App() {
           ))}
         </svg>
 
-        {(Object.keys(labels) as NodeKey[]).map(key => (
+        {nodeKeys.map(key => (
           <button
             key={key}
             type="button"
             className={`node ${key === "center" ? "center" : "leaf"}`}
+            ref={element => {
+              nodeRefs.current[key] = element;
+            }}
             style={{
               left: `${(positions[key].x / GRAPH_SIZE.width) * 100}%`,
               top: `${(positions[key].y / GRAPH_SIZE.height) * 100}%`,
