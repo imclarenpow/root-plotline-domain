@@ -35,6 +35,9 @@ const DRAG_COUPLING_FORCE = 0.18;
 const MAX_VELOCITY = 11;
 const COLLISION_PADDING = 10;
 const COLLISION_RESPONSE = 0.3;
+const TARGET_FRAME_TIME_MS = 16.67;
+const MAX_DELTA_MULTIPLIER = 2;
+const COLLISION_RESOLUTION_PASSES = 2;
 const SIZE_CHANGE_THRESHOLD = 0.01;
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 const createZeroVelocities = (): VelocityMap => ({
@@ -196,11 +199,11 @@ export function App() {
   }, [drag]);
 
   useEffect(() => {
-    let frame = requestAnimationFrame(() => {});
+    let frame = 0;
     let lastTimestamp = performance.now();
 
     const step = (timestamp: number) => {
-      const deltaMultiplier = Math.min((timestamp - lastTimestamp) / 16.67, 2);
+      const deltaMultiplier = Math.min((timestamp - lastTimestamp) / TARGET_FRAME_TIME_MS, MAX_DELTA_MULTIPLIER);
       lastTimestamp = timestamp;
 
       setPositions(previous => {
@@ -231,7 +234,7 @@ export function App() {
           });
         });
 
-        for (let pass = 0; pass < 2; pass += 1) {
+        for (let pass = 0; pass < COLLISION_RESOLUTION_PASSES; pass += 1) {
           for (let index = 0; index < nodeKeys.length; index += 1) {
             for (let compareIndex = index + 1; compareIndex < nodeKeys.length; compareIndex += 1) {
               const aKey = nodeKeys[index];
