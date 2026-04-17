@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import "./index.css";
 
 type NodeKey = "center" | "app" | "sites";
@@ -38,14 +38,18 @@ export function App() {
     const onPointerMove = (event: PointerEvent) => {
       const graphBounds = graphRef.current?.getBoundingClientRect();
       if (!graphBounds) return;
+      const unitsPerPixelX = GRAPH_SIZE.width / graphBounds.width;
+      const unitsPerPixelY = GRAPH_SIZE.height / graphBounds.height;
+      const pointerX = (event.clientX - graphBounds.left) * unitsPerPixelX;
+      const pointerY = (event.clientY - graphBounds.top) * unitsPerPixelY;
 
       const nextX = Math.min(
-        Math.max(event.clientX - graphBounds.left - drag.offsetX, drag.halfWidth),
-        graphBounds.width - drag.halfWidth,
+        Math.max(pointerX - drag.offsetX, drag.halfWidth),
+        GRAPH_SIZE.width - drag.halfWidth,
       );
       const nextY = Math.min(
-        Math.max(event.clientY - graphBounds.top - drag.offsetY, drag.halfHeight),
-        graphBounds.height - drag.halfHeight,
+        Math.max(pointerY - drag.offsetY, drag.halfHeight),
+        GRAPH_SIZE.height - drag.halfHeight,
       );
 
       setPositions(previous => ({
@@ -68,7 +72,7 @@ export function App() {
     };
   }, [drag]);
 
-  const handleSceneMove = (event: MouseEvent<HTMLDivElement>) => {
+  const handleSceneMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const sceneBounds = sceneRef.current?.getBoundingClientRect();
     if (!sceneBounds) return;
 
@@ -93,7 +97,7 @@ export function App() {
     <div
       ref={sceneRef}
       className="space-page"
-      onMouseMove={handleSceneMove}
+      onPointerMove={handleSceneMove}
       style={
         {
           "--parallax-x": `${parallax.x}`,
@@ -113,17 +117,26 @@ export function App() {
             key={key}
             type="button"
             className={`node ${key === "center" ? "center" : "leaf"}`}
-            style={{ left: positions[key].x, top: positions[key].y }}
+            style={{
+              left: `${(positions[key].x / GRAPH_SIZE.width) * 100}%`,
+              top: `${(positions[key].y / GRAPH_SIZE.height) * 100}%`,
+            }}
             onPointerDown={event => {
               const bounds = event.currentTarget.getBoundingClientRect();
-              const centerX = bounds.left + bounds.width / 2;
-              const centerY = bounds.top + bounds.height / 2;
+              const graphBounds = graphRef.current?.getBoundingClientRect();
+              if (!graphBounds) return;
+              const unitsPerPixelX = GRAPH_SIZE.width / graphBounds.width;
+              const unitsPerPixelY = GRAPH_SIZE.height / graphBounds.height;
+              const centerX = (bounds.left + bounds.width / 2 - graphBounds.left) * unitsPerPixelX;
+              const centerY = (bounds.top + bounds.height / 2 - graphBounds.top) * unitsPerPixelY;
+              const pointerX = (event.clientX - graphBounds.left) * unitsPerPixelX;
+              const pointerY = (event.clientY - graphBounds.top) * unitsPerPixelY;
               setDrag({
                 key,
-                offsetX: event.clientX - centerX,
-                offsetY: event.clientY - centerY,
-                halfWidth: bounds.width / 2,
-                halfHeight: bounds.height / 2,
+                offsetX: pointerX - centerX,
+                offsetY: pointerY - centerY,
+                halfWidth: (bounds.width / 2) * unitsPerPixelX,
+                halfHeight: (bounds.height / 2) * unitsPerPixelY,
               });
             }}
           >
