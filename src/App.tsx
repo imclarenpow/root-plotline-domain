@@ -138,7 +138,6 @@ export function App() {
                 halfWidth: (bounds.width / 2) * unitsPerPixelX,
                 halfHeight: (bounds.height / 2) * unitsPerPixelY,
               });
-              event.currentTarget.setPointerCapture(event.pointerId);
             }}
           >
             {labels[key]}
