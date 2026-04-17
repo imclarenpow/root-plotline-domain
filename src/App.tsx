@@ -94,18 +94,29 @@ export function App() {
           };
           const wobbleStrength = Math.min(movedMagnitude * WOBBLE_SCALE_FACTOR, MAX_WOBBLE_MAGNITUDE);
           const wobbleDirection = key === "sites" ? 1 : -1;
-
-          const shifted = {
-            x: previous[key].x + movedBy.x * coupledPull + toDefault.x * DEFAULT_RETURN_FORCE + movedBy.y * PERPENDICULAR_WOBBLE_FACTOR * wobbleDirection,
-            y: previous[key].y + movedBy.y * coupledPull + toDefault.y * DEFAULT_RETURN_FORCE - movedBy.x * PERPENDICULAR_WOBBLE_FACTOR * wobbleDirection,
+          const coupledMotion = {
+            x: movedBy.x * coupledPull,
+            y: movedBy.y * coupledPull,
+          };
+          const restoreForce = {
+            x: toDefault.x * DEFAULT_RETURN_FORCE,
+            y: toDefault.y * DEFAULT_RETURN_FORCE,
+          };
+          const perpendicularWobble = {
+            x: movedBy.y * PERPENDICULAR_WOBBLE_FACTOR * wobbleDirection,
+            y: -movedBy.x * PERPENDICULAR_WOBBLE_FACTOR * wobbleDirection,
+          };
+          const impulseWobble = {
+            x: wobbleStrength * wobbleDirection,
+            y: -wobbleStrength * wobbleDirection * VERTICAL_WOBBLE_DAMPING,
           };
 
-          const withWobble = {
-            x: shifted.x + wobbleStrength * wobbleDirection,
-            y: shifted.y - wobbleStrength * wobbleDirection * VERTICAL_WOBBLE_DAMPING,
+          const nextPoint = {
+            x: previous[key].x + coupledMotion.x + restoreForce.x + perpendicularWobble.x + impulseWobble.x,
+            y: previous[key].y + coupledMotion.y + restoreForce.y + perpendicularWobble.y + impulseWobble.y,
           };
 
-          nextPositions[key] = clampPointToGraph(key, withWobble);
+          nextPositions[key] = clampPointToGraph(key, nextPoint);
         });
 
         return nextPositions;
