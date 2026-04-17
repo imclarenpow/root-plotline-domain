@@ -26,6 +26,12 @@ const nodeBounds: Record<NodeKey, { halfWidth: number; halfHeight: number }> = {
   sites: { halfWidth: 96, halfHeight: 24 },
 };
 
+const WOBBLE_SCALE_FACTOR = 0.08;
+const MAX_WOBBLE_MAGNITUDE = 2.8;
+const DEFAULT_RETURN_FORCE = 0.06;
+const PERPENDICULAR_WOBBLE_FACTOR = 0.07;
+const VERTICAL_WOBBLE_DAMPING = 0.8;
+
 const clampPointToGraph = (key: NodeKey, point: Point): Point => {
   const bounds = nodeBounds[key];
   return {
@@ -86,17 +92,17 @@ export function App() {
             x: defaultPositions[key].x - previous[key].x,
             y: defaultPositions[key].y - previous[key].y,
           };
-          const wobbleStrength = Math.min(movedMagnitude * 0.08, 2.8);
+          const wobbleStrength = Math.min(movedMagnitude * WOBBLE_SCALE_FACTOR, MAX_WOBBLE_MAGNITUDE);
           const wobbleDirection = key === "sites" ? 1 : -1;
 
           const shifted = {
-            x: previous[key].x + movedBy.x * coupledPull + toDefault.x * 0.06 + movedBy.y * 0.07 * wobbleDirection,
-            y: previous[key].y + movedBy.y * coupledPull + toDefault.y * 0.06 - movedBy.x * 0.07 * wobbleDirection,
+            x: previous[key].x + movedBy.x * coupledPull + toDefault.x * DEFAULT_RETURN_FORCE + movedBy.y * PERPENDICULAR_WOBBLE_FACTOR * wobbleDirection,
+            y: previous[key].y + movedBy.y * coupledPull + toDefault.y * DEFAULT_RETURN_FORCE - movedBy.x * PERPENDICULAR_WOBBLE_FACTOR * wobbleDirection,
           };
 
           const withWobble = {
             x: shifted.x + wobbleStrength * wobbleDirection,
-            y: shifted.y - wobbleStrength * wobbleDirection * 0.8,
+            y: shifted.y - wobbleStrength * wobbleDirection * VERTICAL_WOBBLE_DAMPING,
           };
 
           nextPositions[key] = clampPointToGraph(key, withWobble);
