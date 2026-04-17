@@ -6,6 +6,7 @@ type Point = { x: number; y: number };
 type NodeHalfSize = { halfWidth: number; halfHeight: number };
 
 type NodeMap = Record<NodeKey, Point>;
+type VelocityMap = Record<NodeKey, Point>;
 
 const GRAPH_SIZE = { width: 860, height: 520 };
 const defaultPositions: NodeMap = {
@@ -27,32 +28,38 @@ const DEFAULT_NODE_HALF_SIZES: Record<NodeKey, NodeHalfSize> = {
   sites: { halfWidth: 96, halfHeight: 24 },
 };
 
-const WOBBLE_SCALE_FACTOR = 0.08;
-const MAX_WOBBLE_MAGNITUDE = 2.8;
-const DEFAULT_RETURN_FORCE = 0.06;
-const PERPENDICULAR_WOBBLE_FACTOR = 0.07;
-const VERTICAL_WOBBLE_DAMPING = 0.8;
-const COUPLED_PULL_FROM_CENTER_DRAG = 0.44;
-const COUPLED_PULL_TO_CENTER = 0.3;
-const COUPLED_PULL_TO_PEER = 0.2;
+const RESTORE_FORCE = 0.025;
+const DAMPING_PER_FRAME = 0.9;
+const RANDOM_JIGGLE_FORCE = 0.22;
+const DRAG_COUPLING_FORCE = 0.18;
+const MAX_VELOCITY = 11;
+const COLLISION_PADDING = 10;
+const COLLISION_RESPONSE = 0.3;
+const TARGET_FRAME_TIME_MS = 16.67;
+const MAX_DELTA_MULTIPLIER = 2;
+const COLLISION_RESOLUTION_PASSES = 2;
 const SIZE_CHANGE_THRESHOLD = 0.01;
-const wobbleDirectionByNode: Record<NodeKey, number> = {
-  center: 0,
-  app: -1,
-  sites: 1,
-};
-
-const getCoupledPullForce = (draggedKey: NodeKey, targetKey: NodeKey) => {
-  if (draggedKey === "center") return COUPLED_PULL_FROM_CENTER_DRAG;
-  if (targetKey === "center") return COUPLED_PULL_TO_CENTER;
-  return COUPLED_PULL_TO_PEER;
-};
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+const createZeroVelocities = (): VelocityMap => ({
+  center: { x: 0, y: 0 },
+  app: { x: 0, y: 0 },
+  sites: { x: 0, y: 0 },
+});
+const limitVelocity = (point: Point): Point => {
+  const magnitude = Math.hypot(point.x, point.y);
+  if (magnitude <= MAX_VELOCITY) return point;
+  const scale = MAX_VELOCITY / magnitude;
+  return {
+    x: point.x * scale,
+    y: point.y * scale,
+  };
+};
 
 export function App() {
   const sceneRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Partial<Record<NodeKey, HTMLButtonElement | null>>>({});
+  const velocitiesRef = useRef<VelocityMap>(createZeroVelocities());
   const [positions, setPositions] = useState<NodeMap>(defaultPositions);
   const [nodeHalfSizes, setNodeHalfSizes] = useState<Record<NodeKey, NodeHalfSize>>(DEFAULT_NODE_HALF_SIZES);
   const [drag, setDrag] = useState<{
@@ -163,44 +170,17 @@ export function App() {
           x: nextX - previous[drag.key].x,
           y: nextY - previous[drag.key].y,
         };
-        const movedMagnitude = Math.hypot(movedBy.x, movedBy.y);
-
         const nextPositions = { ...previous };
         nextPositions[drag.key] = { x: nextX, y: nextY };
+        velocitiesRef.current[drag.key] = { x: 0, y: 0 };
 
         nodeKeys.forEach(key => {
           if (key === drag.key) return;
-
-          const coupledPull = getCoupledPullForce(drag.key, key);
-          const toDefault = {
-            x: defaultPositions[key].x - previous[key].x,
-            y: defaultPositions[key].y - previous[key].y,
-          };
-          const wobbleStrength = Math.min(movedMagnitude * WOBBLE_SCALE_FACTOR, MAX_WOBBLE_MAGNITUDE);
-          const wobbleDirection = wobbleDirectionByNode[key];
-          const coupledMotion = {
-            x: movedBy.x * coupledPull,
-            y: movedBy.y * coupledPull,
-          };
-          const restoreForce = {
-            x: toDefault.x * DEFAULT_RETURN_FORCE,
-            y: toDefault.y * DEFAULT_RETURN_FORCE,
-          };
-          const perpendicularWobble = {
-            x: movedBy.y * PERPENDICULAR_WOBBLE_FACTOR * wobbleDirection,
-            y: -movedBy.x * PERPENDICULAR_WOBBLE_FACTOR * wobbleDirection,
-          };
-          const impulseWobble = {
-            x: wobbleStrength * wobbleDirection,
-            y: -wobbleStrength * wobbleDirection * VERTICAL_WOBBLE_DAMPING,
-          };
-
-          const nextPoint = {
-            x: previous[key].x + coupledMotion.x + restoreForce.x + perpendicularWobble.x + impulseWobble.x,
-            y: previous[key].y + coupledMotion.y + restoreForce.y + perpendicularWobble.y + impulseWobble.y,
-          };
-
-          nextPositions[key] = clampPointToGraph(key, nextPoint);
+          const nextVelocity = limitVelocity({
+            x: velocitiesRef.current[key].x + movedBy.x * DRAG_COUPLING_FORCE,
+            y: velocitiesRef.current[key].y + movedBy.y * DRAG_COUPLING_FORCE,
+          });
+          velocitiesRef.current[key] = nextVelocity;
         });
 
         return nextPositions;
@@ -217,6 +197,111 @@ export function App() {
       window.removeEventListener("pointerup", onPointerUp);
     };
   }, [drag]);
+
+  useEffect(() => {
+    let frame = 0;
+    let lastTimestamp = performance.now();
+
+    const step = (timestamp: number) => {
+      const deltaMultiplier = Math.min((timestamp - lastTimestamp) / TARGET_FRAME_TIME_MS, MAX_DELTA_MULTIPLIER);
+      lastTimestamp = timestamp;
+
+      setPositions(previous => {
+        const next = { ...previous };
+        const activeDragKey = drag?.key;
+
+        nodeKeys.forEach(key => {
+          if (key === activeDragKey) return;
+
+          const velocity = velocitiesRef.current[key];
+          const jiggle = {
+            x: (Math.random() - 0.5) * RANDOM_JIGGLE_FORCE,
+            y: (Math.random() - 0.5) * RANDOM_JIGGLE_FORCE,
+          };
+          const toDefault = {
+            x: defaultPositions[key].x - previous[key].x,
+            y: defaultPositions[key].y - previous[key].y,
+          };
+          const damping = Math.pow(DAMPING_PER_FRAME, deltaMultiplier);
+          const accelerated = limitVelocity({
+            x: (velocity.x + (toDefault.x * RESTORE_FORCE + jiggle.x) * deltaMultiplier) * damping,
+            y: (velocity.y + (toDefault.y * RESTORE_FORCE + jiggle.y) * deltaMultiplier) * damping,
+          });
+          velocitiesRef.current[key] = accelerated;
+          next[key] = clampPointToGraph(key, {
+            x: previous[key].x + accelerated.x * deltaMultiplier,
+            y: previous[key].y + accelerated.y * deltaMultiplier,
+          });
+        });
+
+        for (let pass = 0; pass < COLLISION_RESOLUTION_PASSES; pass += 1) {
+          for (let index = 0; index < nodeKeys.length; index += 1) {
+            for (let compareIndex = index + 1; compareIndex < nodeKeys.length; compareIndex += 1) {
+              const aKey = nodeKeys[index];
+              const bKey = nodeKeys[compareIndex];
+              const a = next[aKey];
+              const b = next[bKey];
+              const overlapX = (nodeHalfSizes[aKey].halfWidth + nodeHalfSizes[bKey].halfWidth + COLLISION_PADDING) - Math.abs(a.x - b.x);
+              const overlapY = (nodeHalfSizes[aKey].halfHeight + nodeHalfSizes[bKey].halfHeight + COLLISION_PADDING) - Math.abs(a.y - b.y);
+
+              if (overlapX <= 0 || overlapY <= 0) continue;
+
+              const moveA = aKey !== activeDragKey;
+              const moveB = bKey !== activeDragKey;
+              if (!moveA && !moveB) continue;
+
+              if (overlapX < overlapY) {
+                const direction = b.x >= a.x ? 1 : -1;
+                const distance = moveA && moveB ? overlapX / 2 : overlapX;
+
+                if (moveA) {
+                  next[aKey] = clampPointToGraph(aKey, { x: next[aKey].x - direction * distance, y: next[aKey].y });
+                  velocitiesRef.current[aKey] = limitVelocity({
+                    x: velocitiesRef.current[aKey].x - direction * distance * COLLISION_RESPONSE,
+                    y: velocitiesRef.current[aKey].y,
+                  });
+                }
+
+                if (moveB) {
+                  next[bKey] = clampPointToGraph(bKey, { x: next[bKey].x + direction * distance, y: next[bKey].y });
+                  velocitiesRef.current[bKey] = limitVelocity({
+                    x: velocitiesRef.current[bKey].x + direction * distance * COLLISION_RESPONSE,
+                    y: velocitiesRef.current[bKey].y,
+                  });
+                }
+              } else {
+                const direction = b.y >= a.y ? 1 : -1;
+                const distance = moveA && moveB ? overlapY / 2 : overlapY;
+
+                if (moveA) {
+                  next[aKey] = clampPointToGraph(aKey, { x: next[aKey].x, y: next[aKey].y - direction * distance });
+                  velocitiesRef.current[aKey] = limitVelocity({
+                    x: velocitiesRef.current[aKey].x,
+                    y: velocitiesRef.current[aKey].y - direction * distance * COLLISION_RESPONSE,
+                  });
+                }
+
+                if (moveB) {
+                  next[bKey] = clampPointToGraph(bKey, { x: next[bKey].x, y: next[bKey].y + direction * distance });
+                  velocitiesRef.current[bKey] = limitVelocity({
+                    x: velocitiesRef.current[bKey].x,
+                    y: velocitiesRef.current[bKey].y + direction * distance * COLLISION_RESPONSE,
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        return next;
+      });
+
+      frame = requestAnimationFrame(step);
+    };
+
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [clampPointToGraph, drag, nodeHalfSizes]);
 
   const handleSceneMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const sceneBounds = sceneRef.current?.getBoundingClientRect();
