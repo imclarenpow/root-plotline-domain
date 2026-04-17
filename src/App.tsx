@@ -5,6 +5,7 @@ type NodeKey = "center" | "app" | "sites";
 type Point = { x: number; y: number };
 
 type NodeMap = Record<NodeKey, Point>;
+const nodeKeys: NodeKey[] = ["center", "app", "sites"];
 
 const GRAPH_SIZE = { width: 860, height: 520 };
 const defaultPositions: NodeMap = {
@@ -17,6 +18,20 @@ const labels: Record<NodeKey, string> = {
   center: "plotline.nz",
   app: "app.plotline.nz",
   sites: "sites.plotline.nz",
+};
+
+const nodeBounds: Record<NodeKey, { halfWidth: number; halfHeight: number }> = {
+  center: { halfWidth: 106, halfHeight: 26 },
+  app: { halfWidth: 96, halfHeight: 24 },
+  sites: { halfWidth: 96, halfHeight: 24 },
+};
+
+const clampPointToGraph = (key: NodeKey, point: Point): Point => {
+  const bounds = nodeBounds[key];
+  return {
+    x: Math.min(Math.max(point.x, bounds.halfWidth), GRAPH_SIZE.width - bounds.halfWidth),
+    y: Math.min(Math.max(point.y, bounds.halfHeight), GRAPH_SIZE.height - bounds.halfHeight),
+  };
 };
 
 export function App() {
@@ -52,13 +67,43 @@ export function App() {
         GRAPH_SIZE.height - drag.halfHeight,
       );
 
-      setPositions(previous => ({
-        ...previous,
-        [drag.key]: {
-          x: nextX,
-          y: nextY,
-        },
-      }));
+      setPositions(previous => {
+        const movedBy = {
+          x: nextX - previous[drag.key].x,
+          y: nextY - previous[drag.key].y,
+        };
+        const movedMagnitude = Math.hypot(movedBy.x, movedBy.y);
+
+        const nextPositions = { ...previous };
+        nextPositions[drag.key] = { x: nextX, y: nextY };
+
+        nodeKeys.forEach(key => {
+          if (key === drag.key) return;
+
+          const coupledPull =
+            drag.key === "center" ? 0.44 : key === "center" ? 0.3 : 0.2;
+          const toDefault = {
+            x: defaultPositions[key].x - previous[key].x,
+            y: defaultPositions[key].y - previous[key].y,
+          };
+          const wobbleStrength = Math.min(movedMagnitude * 0.08, 2.8);
+          const wobbleDirection = key === "sites" ? 1 : -1;
+
+          const shifted = {
+            x: previous[key].x + movedBy.x * coupledPull + toDefault.x * 0.06 + movedBy.y * 0.07 * wobbleDirection,
+            y: previous[key].y + movedBy.y * coupledPull + toDefault.y * 0.06 - movedBy.x * 0.07 * wobbleDirection,
+          };
+
+          const withWobble = {
+            x: shifted.x + wobbleStrength * wobbleDirection,
+            y: shifted.y - wobbleStrength * wobbleDirection * 0.8,
+          };
+
+          nextPositions[key] = clampPointToGraph(key, withWobble);
+        });
+
+        return nextPositions;
+      });
     };
 
     const onPointerUp = () => setDrag(null);
@@ -112,7 +157,7 @@ export function App() {
           ))}
         </svg>
 
-        {(Object.keys(labels) as NodeKey[]).map(key => (
+        {nodeKeys.map(key => (
           <button
             key={key}
             type="button"
