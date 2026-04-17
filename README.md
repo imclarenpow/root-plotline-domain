@@ -1,21 +1,19 @@
-# bun-react-template
+# root-plotline-domain
 
-To install dependencies:
+Single-page Bun + React site showing an interactive node graph for:
+- `plotline.nz`
+- `app.plotline.nz`
+- `sites.plotline.nz`
+
+## Run
 
 ```bash
 bun install
-```
-
-To start a development server:
-
-```bash
 bun dev
 ```
 
-To run for production:
+## Build
 
 ```bash
-bun start
+bun run build
 ```
-
-This project was created using `bun init` in bun v1.3.12. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
