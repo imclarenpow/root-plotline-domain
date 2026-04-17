@@ -3,6 +3,7 @@ import "./index.css";
 
 type NodeKey = "center" | "app" | "sites";
 type Point = { x: number; y: number };
+type NodeHalfSize = { halfWidth: number; halfHeight: number };
 
 type NodeMap = Record<NodeKey, Point>;
 
@@ -20,7 +21,7 @@ const labels: Record<NodeKey, string> = {
 };
 const nodeKeys = Object.keys(labels) as NodeKey[];
 
-const nodeBounds: Record<NodeKey, { halfWidth: number; halfHeight: number }> = {
+const DEFAULT_NODE_HALF_SIZES: Record<NodeKey, NodeHalfSize> = {
   center: { halfWidth: 106, halfHeight: 26 },
   app: { halfWidth: 96, halfHeight: 24 },
   sites: { halfWidth: 96, halfHeight: 24 },
@@ -45,19 +46,14 @@ const getCoupledPullForce = (draggedKey: NodeKey, targetKey: NodeKey) => {
   if (targetKey === "center") return COUPLED_PULL_TO_CENTER;
   return COUPLED_PULL_TO_PEER;
 };
-
-const clampPointToGraph = (key: NodeKey, point: Point): Point => {
-  const bounds = nodeBounds[key];
-  return {
-    x: Math.min(Math.max(point.x, bounds.halfWidth), GRAPH_SIZE.width - bounds.halfWidth),
-    y: Math.min(Math.max(point.y, bounds.halfHeight), GRAPH_SIZE.height - bounds.halfHeight),
-  };
-};
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 export function App() {
   const sceneRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<HTMLDivElement>(null);
+  const nodeRefs = useRef<Partial<Record<NodeKey, HTMLButtonElement | null>>>({});
   const [positions, setPositions] = useState<NodeMap>(defaultPositions);
+  const [nodeHalfSizes, setNodeHalfSizes] = useState<Record<NodeKey, NodeHalfSize>>(DEFAULT_NODE_HALF_SIZES);
   const [drag, setDrag] = useState<{
     key: NodeKey;
     offsetX: number;
@@ -66,6 +62,83 @@ export function App() {
     halfHeight: number;
   } | null>(null);
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
+  const clampPointToGraph = (key: NodeKey, point: Point): Point => {
+    const bounds = nodeHalfSizes[key];
+    return {
+      x: clamp(point.x, bounds.halfWidth, GRAPH_SIZE.width - bounds.halfWidth),
+      y: clamp(point.y, bounds.halfHeight, GRAPH_SIZE.height - bounds.halfHeight),
+    };
+  };
+
+  useEffect(() => {
+    const measureNodeHalfSizes = () => {
+      const graphBounds = graphRef.current?.getBoundingClientRect();
+      if (!graphBounds) return;
+
+      const unitsPerPixelX = GRAPH_SIZE.width / graphBounds.width;
+      const unitsPerPixelY = GRAPH_SIZE.height / graphBounds.height;
+
+      setNodeHalfSizes(previous => {
+        let changed = false;
+        const next = { ...previous };
+
+        nodeKeys.forEach(key => {
+          const nodeElement = nodeRefs.current[key];
+          if (!nodeElement) return;
+
+          const nodeBounds = nodeElement.getBoundingClientRect();
+          const halfWidth = (nodeBounds.width / 2) * unitsPerPixelX;
+          const halfHeight = (nodeBounds.height / 2) * unitsPerPixelY;
+
+          if (
+            Math.abs(previous[key].halfWidth - halfWidth) > 0.01
+            || Math.abs(previous[key].halfHeight - halfHeight) > 0.01
+          ) {
+            next[key] = { halfWidth, halfHeight };
+            changed = true;
+          }
+        });
+
+        return changed ? next : previous;
+      });
+    };
+
+    measureNodeHalfSizes();
+
+    const resizeObserver = new ResizeObserver(measureNodeHalfSizes);
+    if (graphRef.current) {
+      resizeObserver.observe(graphRef.current);
+    }
+    nodeKeys.forEach(key => {
+      const nodeElement = nodeRefs.current[key];
+      if (nodeElement) {
+        resizeObserver.observe(nodeElement);
+      }
+    });
+    window.addEventListener("resize", measureNodeHalfSizes);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", measureNodeHalfSizes);
+    };
+  }, []);
+
+  useEffect(() => {
+    setPositions(previous => {
+      let changed = false;
+      const next = { ...previous };
+
+      nodeKeys.forEach(key => {
+        const clamped = clampPointToGraph(key, previous[key]);
+        if (clamped.x !== previous[key].x || clamped.y !== previous[key].y) {
+          next[key] = clamped;
+          changed = true;
+        }
+      });
+
+      return changed ? next : previous;
+    });
+  }, [nodeHalfSizes]);
 
   useEffect(() => {
     if (!drag) return;
@@ -192,6 +265,9 @@ export function App() {
             key={key}
             type="button"
             className={`node ${key === "center" ? "center" : "leaf"}`}
+            ref={element => {
+              nodeRefs.current[key] = element;
+            }}
             style={{
               left: `${(positions[key].x / GRAPH_SIZE.width) * 100}%`,
               top: `${(positions[key].y / GRAPH_SIZE.height) * 100}%`,
