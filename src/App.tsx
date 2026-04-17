@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import "./index.css";
 
 type NodeKey = "center" | "app" | "sites";
@@ -62,13 +62,13 @@ export function App() {
     halfHeight: number;
   } | null>(null);
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
-  const clampPointToGraph = (key: NodeKey, point: Point): Point => {
+  const clampPointToGraph = useCallback((key: NodeKey, point: Point): Point => {
     const bounds = nodeHalfSizes[key];
     return {
       x: clamp(point.x, bounds.halfWidth, GRAPH_SIZE.width - bounds.halfWidth),
       y: clamp(point.y, bounds.halfHeight, GRAPH_SIZE.height - bounds.halfHeight),
     };
-  };
+  }, [nodeHalfSizes]);
 
   useEffect(() => {
     const measureNodeHalfSizes = () => {
@@ -138,7 +138,7 @@ export function App() {
 
       return changed ? next : previous;
     });
-  }, [nodeHalfSizes]);
+  }, [clampPointToGraph]);
 
   useEffect(() => {
     if (!drag) return;
