@@ -5,7 +5,6 @@ type NodeKey = "center" | "app" | "sites";
 type Point = { x: number; y: number };
 
 type NodeMap = Record<NodeKey, Point>;
-const nodeKeys: NodeKey[] = ["center", "app", "sites"];
 
 const GRAPH_SIZE = { width: 860, height: 520 };
 const defaultPositions: NodeMap = {
@@ -19,6 +18,7 @@ const labels: Record<NodeKey, string> = {
   app: "app.plotline.nz",
   sites: "sites.plotline.nz",
 };
+const nodeKeys = Object.keys(labels) as NodeKey[];
 
 const nodeBounds: Record<NodeKey, { halfWidth: number; halfHeight: number }> = {
   center: { halfWidth: 106, halfHeight: 26 },
@@ -38,6 +38,12 @@ const wobbleDirectionByNode: Record<NodeKey, number> = {
   center: 0,
   app: -1,
   sites: 1,
+};
+
+const getCoupledPullForce = (draggedKey: NodeKey, targetKey: NodeKey) => {
+  if (draggedKey === "center") return COUPLED_PULL_FROM_CENTER_DRAG;
+  if (targetKey === "center") return COUPLED_PULL_TO_CENTER;
+  return COUPLED_PULL_TO_PEER;
 };
 
 const clampPointToGraph = (key: NodeKey, point: Point): Point => {
@@ -94,8 +100,7 @@ export function App() {
         nodeKeys.forEach(key => {
           if (key === drag.key) return;
 
-          const coupledPull =
-            drag.key === "center" ? COUPLED_PULL_FROM_CENTER_DRAG : key === "center" ? COUPLED_PULL_TO_CENTER : COUPLED_PULL_TO_PEER;
+          const coupledPull = getCoupledPullForce(drag.key, key);
           const toDefault = {
             x: defaultPositions[key].x - previous[key].x,
             y: defaultPositions[key].y - previous[key].y,
